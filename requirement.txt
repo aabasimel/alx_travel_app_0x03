@@ -16,4 +16,5 @@ djangorestframework
 django-cors-headers
 drf-yasg
 mysqlclient
-django_filters
+celery
+django-celery-beat

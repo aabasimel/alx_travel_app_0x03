@@ -19,6 +19,8 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+# settings.py
+TIME_ZONE = 'UTC'
 
 
 
@@ -34,7 +36,14 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
-# Application definition
+# Application definitCELERY_BROKER_URL = env('CELERY_BROKER_URL', default='amqp://guest:guest@localhost:5672//')
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -48,6 +57,8 @@ INSTALLED_APPS = [
     'drf_yasg',
     'listings',
     'django_filters',
+    'django_celery_results',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [

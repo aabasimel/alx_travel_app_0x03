@@ -19,7 +19,7 @@ from .serializers import (
 import os
 import requests
 from rest_framework.permissions import IsAuthenticated
-from .tasks import send_booking_confirmation_email
+# from .tasks import send_booking_confirmation_email
 
 
 
@@ -96,9 +96,9 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.save()
         serializer = BookingDetailSerializer(booking)
         return Response(serializer.data)
-    def perform_create(self, serializer):
-        booking=serializer.save(user=self.request.user)
-        send_booking_confirmation_email.delay(booking.booking_id)
+    # def perform_create(self, serializer):
+    #     booking=serializer.save(user=self.request.user)
+    #     send_booking_confirmation_email.delay(booking.booking_id)
 
 
 class ReviewViewSet(viewsets.ModelViewSet):

@@ -6,20 +6,22 @@ set -e
 set -x
 
 cd /app
-
 source /venv/bin/activate
 
-echo "waiting for postgres..."
+echo "Waiting for Postgres at ${DB_HOST}:${DB_PORT}..."
 
-util pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" > /dell/null 2> &1; do
+until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; do
+    echo "Waiting for Postgres..."
     sleep 1
 done
 
-echo "postgres is ready!"
+echo "Postgres is ready!"
+echo "Running migrations..."
 
-echo "Running migrations...."
+if [ -f /app/migrate ]; then
+    echo "Running migrations..."
+    bash /app/migrate
+fi
 
-bash /app/migrate
 
 /venv/bin/gunicorn --worker-tmp-dir /dev/shm alx_travel_app:application --bind "0.0.0.0:${APP_PORT}"
-

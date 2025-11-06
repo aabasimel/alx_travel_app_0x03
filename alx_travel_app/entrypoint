@@ -24,4 +24,4 @@ if [ -f /app/migrate ]; then
 fi
 
 
-/venv/bin/gunicorn --worker-tmp-dir /dev/shm alx_travel_app:application --bind "0.0.0.0:${APP_PORT}"
+/venv/bin/gunicorn --worker-tmp-dir /dev/shm alx_travel_app.wsgi:application --bind "0.0.0.0:${APP_PORT}"

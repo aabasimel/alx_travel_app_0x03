@@ -1,23 +1,40 @@
 #!/bin/bash
-
 set -e
 set -x
 
 cd /app/
 
+# Activate virtualenv
+source /venv/bin/activate
+
+# Wait for Postgres
+echo "Waiting for Postgres at db:5432..."
+until pg_isready -h db -p 5432; do
+  sleep 1
+done
+
+echo "Postgres is ready!"
+echo "Running migrations..."
 /venv/bin/python manage.py migrate --noinput
 
-/venv/bin/python shell -c '
-from django.contrib.auth import get_user_mode;
-User=get_user_model();
-email="admin@gmail.com";
-password="admin";
-first_name="Admin";
-last_name="Admin";
+# Create superuser if it doesn't exist
+/venv/bin/python manage.py shell -c "
+from django.contrib.auth import get_user_model
 
-if not User.objects.filter(email=email).exist():
-    User.objects.create_superuser(email=email,first_name=first_name,last_name=last_name,password=password)
-    print(f"Superuser created: {email}");
+User = get_user_model()
+email = 'admin@gmail.com'
+password = 'admin'
+first_name = 'Admin'
+last_name = 'Admin'
+
+if not User.objects.filter(email=email).exists():
+    User.objects.create_superuser(
+        email=email,
+        password=password,
+        first_name=first_name,
+        last_name=last_name
+    )
+    print(f'Superuser created: {email}')
 else:
-    print(f"Superuser already exists: {email}");
-'
+    print(f'Superuser already exists: {email}')
+"

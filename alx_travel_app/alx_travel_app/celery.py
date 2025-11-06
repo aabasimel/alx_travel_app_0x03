@@ -1,5 +1,7 @@
 import os
-from alx_travel_app.alx_travel_app.celery import Celery 
+from alx_travel_app.alx_travel_app.celery import Celery
+
+# Set the default Django settings module
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "alx_travel_app.settings")
 
 app = Celery("alx_travel_app", broker="amqp://guest:guest@localhost//")

@@ -18,3 +18,4 @@ drf-yasg
 mysqlclient
 celery
 django-celery-beat
+psycopg2-binary

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+set -x
+
+cd /app/
+
+/venv/bin/python manage.py migrate --noinput
+
+/venv/bin/python shell -c '
+from django.contrib.auth import get_user_mode;
+User=get_user_model();
+email="admin@gmail.com";
+password="admin";
+first_name="Admin";
+last_name="Admin";
+
+if not User.objects.filter(email=email).exist():
+    User.objects.create_superuser(email=email,first_name=first_name,last_name=last_name,password=password)
+    print(f"Superuser created: {email}");
+else:
+    print(f"Superuser already exists: {email}");
+'

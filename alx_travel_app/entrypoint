@@ -1,0 +1,25 @@
+#!/bin/bash
+
+APP_PORT=${PORT:-8087}
+
+set -e
+set -x
+
+cd /app
+
+source /venv/bin/activate
+
+echo "waiting for postgres..."
+
+util pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" > /dell/null 2> &1; do
+    sleep 1
+done
+
+echo "postgres is ready!"
+
+echo "Running migrations...."
+
+bash /app/migrate
+
+/venv/bin/gunicorn --worker-tmp-dir /dev/shm alx_travel_app:application --bind "0.0.0.0:${APP_PORT}"
+

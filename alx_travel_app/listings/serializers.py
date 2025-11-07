@@ -4,6 +4,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import User, Property, Booking, Review,Payment
 from django.contrib.auth import authenticate,get_user_model
+import uuid
 
 class UserRegistrationSerializer (serializers.ModelSerializer):
     """Serializer for user registration"""
@@ -176,13 +177,16 @@ class ProperyCreateSerializer(serializers.ModelSerializer):
 class BookingListSerializer(serializers.ModelSerializer):
     """Serializer for Booking list view"""
 
-    property_name = serializers.CharField(source="property.name", read_only=True)
-    property_location = serializers.CharField(
-        source="property.location", read_only=True
+    property_name = serializers.CharField(source="property_obj.name", read_only=True)
+    property_address = serializers.CharField(
+        source="property_obj.address", read_only=True
     )
     guest_name = serializers.CharField(source="user.get_full_name", read_only=True)
     total_nights = serializers.ReadOnlyField()
     total_price = serializers.ReadOnlyField()
+    city=serializers.ReadOnlyField()
+    country=serializers.ReadOnlyField()
+
 
     class Meta:
         """Booking List serialier definition"""
@@ -203,25 +207,37 @@ class BookingListSerializer(serializers.ModelSerializer):
 
 
 class BookingDetailSerializer(serializers.ModelSerializer):
-    """Serializer for Booking detail view and creation"""
+    """Serializer for booking detail view"""
+    property_name = serializers.CharField(source='property_obj.name', read_only=True)
+    property_location = serializers.CharField(source='property_obj.location', read_only=True)
+    property_price = serializers.DecimalField(source='property_obj.pricepernight', 
+                                            max_digits=10, decimal_places=2, read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
+    total_nights = serializers.IntegerField(read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
-    property = PropertyListSerializer(read_only=True)
+    class Meta:
+        model = Booking
+        fields = '__all__'
+        read_only_fields = ('booking_id', 'property_obj', 'user', 'created_at')
+
+class BookingCreateSerializer(serializers.ModelSerializer):
+    """Serializer for Booking creation"""
+
+    property_list = PropertyListSerializer(source='property_obj', read_only=True)
     property_id = serializers.UUIDField(write_only=True)
     user = UserSerializer(read_only=True)
-    user_id = serializers.UUIDField(write_only=True)
     total_nights = serializers.ReadOnlyField()
     total_price = serializers.ReadOnlyField()
 
     class Meta:
-        """Booking Detail serializer definition"""
-
         model = Booking
         fields = [
             "booking_id",
-            "property",
-            "property_id",
+            "property_list", 
             "user",
-            "user_id",
+            "property_id",
             "start_date",
             "end_date",
             "total_nights",
@@ -229,149 +245,179 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
-        read_only_fields = ["booking_id", "created_at"]
+        read_only_fields = ["booking_id", "created_at", "status", "user"]
 
     def validate(self, attrs):
-        start_date = attrs.get("start_date")
-        end_date = attrs.get("end_date")
-        property_id = attrs.get("property_id")
-
-        if start_date and end_date:
-            if start_date >= end_date:
-                raise serializers.ValidationError("End date must be after start date.")
-
-            # Check for overlapping bookings if property is provided
-            if property_id:
-                # pylint: disable=no-member
+        start_date = attrs.get('start_date')
+        end_date = attrs.get('end_date')
+        
+        if start_date and end_date and start_date >= end_date:
+            raise serializers.ValidationError("End date must be after start date")
+        
+        property_id = attrs.get('property_id')
+        if property_id and start_date and end_date:
+            try:
+                property_obj = Property.objects.get(property_id=property_id)
+                
+                # Check if property is available
+                if not property_obj.is_available:
+                    raise serializers.ValidationError("Property is not available for booking.")
+                
+                # Check for overlapping bookings
                 overlapping_bookings = Booking.objects.filter(
-                    property_id=property_id,
-                    status__in=["pending", "confirmed"],
+                    property_obj=property_obj,
+                    status__in=['pending', 'confirmed'],
                     start_date__lt=end_date,
-                    end_date__gt=start_date,
+                    end_date__gt=start_date
                 )
-
-                # Exclude current booking if updating
-                if self.instance:
-                    overlapping_bookings = overlapping_bookings.exclude(
-                        booking_id=self.instance.booking_id
-                    )
-
                 if overlapping_bookings.exists():
-                    raise serializers.ValidationError(
-                        "Property is not available for the selected dates."
-                    )
-
+                    raise serializers.ValidationError("Property is not available for the selected dates")
+                    
+            except Property.DoesNotExist:
+                raise serializers.ValidationError("Property not found")
+        
         return attrs
 
-    def validate_user_id(self, value):
-        """Validate user's id"""
-        try:
-            user = User.objects.get(user_id=value)
-            if user.role not in ["guest", "admin"]:
-                raise serializers.ValidationError("Only guests can make bookings.")
-        except User.DoesNotExist as exc:  # pylint: disable=no-member
-            raise serializers.ValidationError("Guest not found.") from exc
-        return value
-
     def validate_property_id(self, value):
-        """Validate property's id"""
+        """Validate property exists"""
         try:
-            Property.objects.get(property_id=value)  # pylint: disable=no-member
-        except Property.DoesNotExist as exc:  # pylint: disable=no-member
-            raise serializers.ValidationError("Property not found.") from exc
+            Property.objects.get(property_id=value)
+        except Property.DoesNotExist:
+            raise serializers.ValidationError("Property not found.")
         return value
 
+    def create(self, validated_data):
+        user = self.context['request'].user
+        property_id = validated_data.pop('property_id')
+        property_obj = Property.objects.get(property_id=property_id)
+        
+        # Set default status
+        validated_data.setdefault('status', 'pending')
+        
+        # Create the booking
+        booking = Booking.objects.create(
+            property_obj=property_obj,
+            user=user,
+            **validated_data
+        )
+        
+        # Check if this booking makes the property unavailable (has overlapping bookings)
+        self.update_property_availability(property_obj)
+        
+        return booking
 
-class ReviewSerializer(serializers.ModelSerializer):
-    """Serializer for Review model"""
+    def update_property_availability(self, property_obj):
+        """Update property availability based on overlapping bookings"""
+        # Check if there are any active bookings (pending or confirmed)
+        active_bookings = Booking.objects.filter(
+            property_obj=property_obj,
+            status__in=['pending', 'confirmed']
+        ).exists()
+        
+        # Update property availability
+        if active_bookings:
+            property_obj.is_available = False
+        else:
+            property_obj.is_available = True
+            
+        property_obj.save()
 
-    property_name = serializers.CharField(source="property.name", read_only=True)
-    reviewer_name = serializers.CharField(source="user.get_full_name", read_only=True)
-    property_id = serializers.UUIDField(write_only=True)
-    user_id = serializers.UUIDField(write_only=True)
+class ReviewListSerializer(serializers.ModelSerializer):
+    """Serializer for review listing"""
+    property_name = serializers.CharField(source='property_obj.name', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
 
     class Meta:
-        """Review model serializer definition"""
-
         model = Review
-        fields = [
-            "review_id",
-            "property_name",
-            "reviewer_name",
-            "property_id",
-            "user_id",
-            "rating",
-            "comment",
-            "created_at",
-        ]
-        read_only_fields = ["review_id", "created_at"]
+        fields = ('review_id', 'property_name', 'user_name', 'rating', 
+                 'comment', 'created_at')
+        
+class ReviewSerializer(serializers.ModelSerializer):
+    """Serializer for review detail view"""
+    property_name = serializers.CharField(source='property_obj.name', read_only=True)
+    property_location = serializers.CharField(source='property_obj.location', read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
 
+    class Meta:
+        model = Review
+        fields = '__all__'
+        read_only_fields = ('review_id', 'property_obj', 'user', 'created_at')
+
+class ReviewCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating reviews"""
+    
+    class Meta:
+        model = Review
+        fields = ('property_obj', 'rating', 'comment')
+    
     def validate(self, attrs):
-        property_id = attrs.get("property_id")
-        user_id = attrs.get("user_id")
-
-        # Check if user has a confirmed booking for this property
-        if property_id and user_id:
-            has_booking = Booking.objects.filter(  # pylint: disable=no-member
-                property_id=property_id,
-                user_id=user_id,
-                status="confirmed",
-                end_date__lt=timezone.now().date(),  # Booking must be completed
-            ).exists()
-
-            if not has_booking:
-                raise serializers.ValidationError(
-                    "You can only review properties you have stayed at."
-                )
-
+        user = self.context['request'].user
+        property_obj = attrs.get('property_obj')
+        
+        # Check if user has already reviewed this property
+        if Review.objects.filter(user=user, property_obj=property_obj).exists():
+            raise serializers.ValidationError("You have already reviewed this property")
+        
+        # Check if user has actually booked this property
+        has_booking = Booking.objects.filter(
+            user=user, 
+            property_obj=property_obj,
+            status='confirmed',
+            end_date__lt=timezone.now().date()  # Only allow reviews after stay
+        ).exists()
+        
+        if not has_booking:
+            raise serializers.ValidationError("You can only review properties you have stayed at")
+        
         return attrs
-
-    def validate_property_id(self, value):
-        """Validate property's id"""
-        try:
-            Property.objects.get(property_id=value)  # pylint: disable=no-member
-        except Property.DoesNotExist as exc:  # pylint: disable=no-member
-            raise serializers.ValidationError("Property not found.") from exc
-        return value
-
-    def validate_user_id(self, value):
-        """Validate user's id"""
-        try:
-            User.objects.get(user_id=value)
-        except User.DoesNotExist as exc:  # pylint: disable=no-member
-            raise serializers.ValidationError("User not found.") from exc
-        return value
+    
+    def create(self, validated_data):
+        # The user will be set from the request user in the view
+        return Review.objects.create(**validated_data)
+    
 class PaymentSerializer(serializers.ModelSerializer):
-    booking = BookingListSerializer(read_only=True)
-    booking_id = serializers.UUIDField(write_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-
+    """Serializer for payments"""
+    booking_details = BookingListSerializer(source='booking', read_only=True)
+    
     class Meta:
         model = Payment
-        fields = [
-            'payment_id', 'booking', 'booking_id', 'amount', 'transaction_id',
-            'reference', 'status', 'status_display', 'payment_method',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = [
-            'payment_id', 'transaction_id', 'status', 'reference',
-            'created_at', 'updated_at'
-        ]
+        fields = '__all__'
+        read_only_fields = ('payment_id', 'created_at', 'updated_at')
 
-    def validate_booking_id(self, value):
-        """Validate that the booking exists and doesn't already have a payment"""
-        try:
-            booking = Booking.objects.get(booking_id=value)
-        except Booking.DoesNotExist:
-            raise serializers.ValidationError("Booking not found.")
 
-        if hasattr(booking, 'payment'):
-            raise serializers.ValidationError("Payment already exists for this booking.")
+class PaymentCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating payments"""
+    
+    class Meta:
+        model = Payment
+        fields = ('booking', 'amount', 'payment_method')
+        read_only_fields = ('amount',)
+    
+    def validate(self, attrs):
+        booking = attrs.get('booking')
+        
+        # Auto-set amount from booking
+        if booking:
+            attrs['amount'] = booking.total_price
+        
+        # Generate unique reference
+        attrs['reference'] = f"CHAPA-{uuid.uuid4().hex[:12].upper()}"
+        
+        return attrs
 
-        return value
 
-    def validate_amount(self, value):
-        """Ensure amount is positive"""
-        if value <= 0:
-            raise serializers.ValidationError("Amount must be greater than zero.")
-        return value
+class UserStatsSerializer(serializers.Serializer):
+    """Serializer for user statistics"""
+    total_bookings = serializers.IntegerField()
+    total_reviews = serializers.IntegerField()
+    total_properties = serializers.IntegerField()
+    upcoming_bookings = serializers.IntegerField()
+
+
+class PropertyStatsSerializer(serializers.Serializer):
+    """Serializer for property statistics"""
+    total_bookings = serializers.IntegerField()
+    average_rating = serializers.DecimalField(max_digits=3, decimal_places=2)
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+    occupancy_rate = serializers.DecimalField(max_digits=5, decimal_places=2)

@@ -14,6 +14,9 @@ until pg_isready -h db -p 5432; do
 done
 
 echo "Postgres is ready!"
+echo "Creating migration files..."
+/venv/bin/python manage.py makemigrations --noinput
+
 echo "Running migrations..."
 /venv/bin/python manage.py migrate --noinput
 

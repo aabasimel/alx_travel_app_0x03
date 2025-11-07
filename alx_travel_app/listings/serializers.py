@@ -3,6 +3,60 @@
 from rest_framework import serializers
 from django.utils import timezone
 from .models import User, Property, Booking, Review,Payment
+from django.contrib.auth import authenticate,get_user_model
+
+class UserRegistrationSerializer (serializers.ModelSerializer):
+    """Serializer for user registration"""
+    password=serializers.CharField(write_only=True,min_length=8)
+    password_confirm=serializers.CharField(write_only=True,min_length=8)
+
+    class Meta:
+        model=User
+        fields = ('user_id', 'first_name', 'last_name', 'email', 'phone_number', 
+                 'role', 'password', 'password_confirm', 'created_at')
+        read_only_fields=[
+            'user_id',
+            'created_at',
+
+        ]
+        extra_kwargs = {
+            'email': {'required': True},
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+        }
+
+        def validate(self,attrs):
+            password=attrs.get('password')
+            confirm_password=attrs.get('password_confirm')
+
+            if password !=confirm_password:
+                raise serializers.ValidationError("password doesn't match")
+            
+            return attrs
+        
+        def create(self,validated_data):
+            validated_data.pop('password_confirm')
+            password=validated_data.pop('password')
+            user=User.objects.create(password=password,**validated_data)
+            return user
+
+class UserLoginSerializer(serializers.Serializer):
+    """Serializer for user login"""
+    email=serializers.EmailField()
+    password=serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        email=attrs.get('email')
+        password=attrs.get('password')
+        if email and password:
+            user = authenticate(username=email, password=password)  # This might work!
+            if not user:
+                raise serializers.ValidationError('Invalid email or password')
+            if not user.is_active:
+                raise serializers.ValidationError('User account is disabled')
+            attrs['user'] = user
+            return attrs
+        raise serializers.ValidationError('Email and password are required')
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -24,7 +78,7 @@ class UserSerializer(serializers.ModelSerializer):
             "role",
             "created_at",
         ]
-        read_only_fields = ["user_id", "created_at"]
+        read_only_fields = ["user_id", "created_at","email","phone_number"]
 
     def get_full_name(self, obj):
         """Get user's full name"""
@@ -74,28 +128,15 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
 
     host = UserSerializer(read_only=True)
     host_id = serializers.UUIDField(write_only=True)
-    average_rating = serializers.SerializerMethodField()
-    review_count = serializers.SerializerMethodField()
+    average_rating = serializers.SerializerMethodField(read_only=True)
+    review_count = serializers.SerializerMethodField(read_only=True)
     total_nights_booked = serializers.SerializerMethodField()
 
     class Meta:
         """Property Detail serializer definition"""
 
         model = Property
-        fields = [
-            "property_id",
-            "name",
-            "description",
-            "location",
-            "pricepernight",
-            "host",
-            "host_id",
-            "average_rating",
-            "review_count",
-            "total_nights_booked",
-            "created_at",
-            "updated_at",
-        ]
+        fields = '__all__'
         read_only_fields = ["property_id", "created_at", "updated_at"]
 
     def get_average_rating(self, obj):
@@ -125,8 +166,13 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
         except User.DoesNotExist as exc:  # pylint: disable=no-member
             raise serializers.ValidationError("Host not found.") from exc
         return value
-
-
+class ProperyCreateSerializer(serializers.ModelSerializer):
+    """serializer for property creation"""
+    class Meta:
+        model=Property
+        fileds=('name','description','amenities','address','city','country','pricepernight')
+    def create(self, validated_data):
+        return Property.objects.create(**validated_data)
 class BookingListSerializer(serializers.ModelSerializer):
     """Serializer for Booking list view"""
 

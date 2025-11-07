@@ -78,7 +78,7 @@ class User(AbstractUser):
 class Property(models.Model):
     """Property model matching the SQL schema"""
 
-    property_obj_id = models.UUIDField(
+    property_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
@@ -91,10 +91,14 @@ class Property(models.Model):
     )
     name = models.CharField(max_length=150)
     description = models.TextField()
-    location = models.CharField(max_length=255)
+    amenities=models.JSONField(default=list,blank=True)
+    address=models.CharField(max_length=255,default="unknown address")
+    city=models.CharField(max_length=100,default="uncknown city")
+    country=models.CharField(max_length=100,default="uncknown country")
     pricepernight = models.DecimalField(
         max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))]
     )
+    is_vailable=models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -104,8 +108,7 @@ class Property(models.Model):
         db_table = "property"
         indexes = [
             models.Index(fields=["host"], name="idx_property_host"),
-            models.Index(fields=["property_obj_id"], name="idx_property_id"),
-            models.Index(fields=["location"], name="idx_property_location"),
+            models.Index(fields=["property_id"], name="idx_property_id"),
         ]
 
     def __str__(self):
@@ -146,10 +149,11 @@ class Booking(models.Model):
         ]
 
     def clean(self):
-
-        if self.start_date and self.end_date and self.start_date >= self.end_date:
-            raise ValidationError("End date must be after start date.")
-
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError("start date cannot be greater than end date")
+        if self.price_per_night is not None and self.price_per_night < 0:
+            raise ValidationError("Price per night cannot be less than zero.")
+        
     @property
     def total_nights(self):
         """Calculating number of nights"""

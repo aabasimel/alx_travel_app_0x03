@@ -50,8 +50,8 @@ class User(AbstractUser):
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="guest")
     created_at = models.DateTimeField(auto_now_add=True)
+    admin_requested = models.BooleanField(default=False)
 
-    # Remove username field
     username = None
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
@@ -98,7 +98,7 @@ class Property(models.Model):
     pricepernight = models.DecimalField(
         max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))]
     )
-    is_vailable=models.BooleanField(default=True)
+    is_available=models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

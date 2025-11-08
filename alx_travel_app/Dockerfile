@@ -18,7 +18,7 @@ RUN pip install --upgrade pip
 
 # Copy requirements first for caching
 COPY requirements.txt /app/
-COPY .env /app/.env
+
 
 # Create virtual environment and install dependencies
 RUN python -m venv /venv \

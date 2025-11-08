@@ -22,7 +22,12 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 # settings.py
 TIME_ZONE = 'UTC'
 
+AUTHENTICATION_BACKENDS = [
+    'listings.backends.EmailBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
 
+AUTH_USER_MODEL ='listings.User'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -54,11 +59,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     'rest_framework',
     'corsheaders',
-    'drf_yasg',
+    'drf_spectacular',
     'listings',
     'django_filters',
     'django_celery_results',
     'django_celery_beat',
+    'rest_framework_simplejwt',
+
 ]
 
 MIDDLEWARE = [
@@ -149,10 +156,60 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # settings.py
 AUTH_USER_MODEL = 'listings.User'
+
+# settings.py
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': (
+                'JWT Authorization header using the Bearer scheme.\n\n'
+                '**Example:** `Bearer <access_token>`\n\n'
+                '⚠️ Do not include JSON or the refresh token.'
+            ),
+        }
+    },
+    'USE_SESSION_AUTH': False,
+    'JSON_EDITOR': True,
+}
+
+
+# REST Framework configuration
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+}
+# JWT Settings
+from datetime import timedelta
+
+
+SIMPLE_JWT = {
+    'USER_ID_FIELD': 'user_id',  # Use your custom user_id field
+    'USER_ID_CLAIM': 'user_id',
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'ALX Travel API',
+    'DESCRIPTION': 'API documentation for ALX Travel App',
+    'VERSION': '1.0.0',
 }

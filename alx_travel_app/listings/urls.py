@@ -2,7 +2,8 @@
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import PropertyViewSet, BookingViewSet, UserViewSet, ReviewViewSet
+from . import views  
+from .views import PropertyViewSet, BookingViewSet, UserViewSet, ReviewViewSet,ApproveAdminView
 
 router = DefaultRouter()
 router.register(r"properties", PropertyViewSet, basename="property")
@@ -13,9 +14,24 @@ router.register(r"users", UserViewSet, basename="user")
 APP_NAME = "listings"
 
 urlpatterns = [
-    path("", include(router.urls)),
-    path('api/', include(router.urls)),
+    path("", include(router.urls)),  
+    
+    # Authentication
+    path('auth/register/', views.UserRegistrationView.as_view(), name='register'),
+    path('auth/login/', views.UserLoginView.as_view(), name='login'),
+    path('auth/logout/', views.UserLogoutView.as_view(), name='logout'),
+    
+    # User profiles
+    path('user/profile/', views.UserProfileView.as_view(), name='user-profile'),
+    path('user/stats/', views.UserStatsView.as_view(), name='user-stats'),
+    
+    # Search
+    path('search/properties/', views.PropertySearchView.as_view(), name='property-search'),
+    
+    # Dashboards
+    path('dashboard/host/', views.HostDashboardView.as_view(), name='host-dashboard'),
+    path('users/<uuid:user_id>/approve-admin/', ApproveAdminView.as_view(), name='approve-admin'),
+
     
 
-    path('api/auth/', include('rest_framework.urls')),  
 ]

@@ -8,23 +8,25 @@ set -x
 cd /app
 source /venv/bin/activate
 
-DB_HOST="dpg-d487qj4hg0os7383vib0-a.oregon-postgres.render.com"
-DB_PORT="5432"
+# Use environment variables if set, fallback to hardcoded values
+DB_HOST=${DB_HOST:-dpg-d487qj4hg0os7383vib0-a.oregon-postgres.render.com}
+DB_PORT=${DB_PORT:-5432}
 
 echo "Waiting for Postgres at ${DB_HOST}:${DB_PORT}..."
 
-until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; do
+# Loop until Postgres is ready
+until pg_isready "postgresql://${DB_HOST}:${DB_PORT}" >/dev/null 2>&1; do
     echo "Waiting for Postgres..."
     sleep 1
 done
 
 echo "Postgres is ready!"
-echo "Running migrations..."
 
+# Run migrations if the migrate script exists
 if [ -f /app/migrate ]; then
     echo "Running migrations..."
     bash /app/migrate
 fi
 
-
-/venv/bin/gunicorn --worker-tmp-dir /dev/shm alx_travel_app.wsgi:application --bind "0.0.0.0:${APP_PORT}"
+# Start Gunicorn
+exec /venv/bin/gunicorn --worker-tmp-dir /dev/shm alx_travel_app.wsgi:application --bind "0.0.0.0:${APP_PORT}"

@@ -18,3 +18,4 @@ gunicorn
 djangorestframework-simplejwt
 drf-yasg
 drf-yasg
+dj-database-url

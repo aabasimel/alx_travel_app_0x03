@@ -8,6 +8,9 @@ set -x
 cd /app
 source /venv/bin/activate
 
+DB_HOST="dpg-d487qj4hg0os7383vib0-a.oregon-postgres.render.com"
+DB_PORT="5432"
+
 echo "Waiting for Postgres at ${DB_HOST}:${DB_PORT}..."
 
 until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" >/dev/null 2>&1; do

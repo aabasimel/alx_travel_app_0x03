@@ -503,7 +503,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 class ReviewViewSet(viewsets.ModelViewSet):
     """ViewSet for Review model"""
     serializer_class = ReviewSerializer
-    # permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -545,6 +545,12 @@ class UserViewSet(viewsets.ModelViewSet):
     search_fields = ["first_name", "last_name", "email"]
     ordering_fields = ["first_name", "last_name", "created_at"]
     ordering = ["-created_at"]
+    permission_classes = [IsAdminUser]
+
+    def get_serializer(self, *args, **kwargs):
+        if action == "create":
+            return UserRegistrationSerializer(*args, **kwargs)
+        return super().get_serializer(*args,**kwargs)
 
     @action(detail=True, methods=["get"])
     def properties(self, request, pk=None):

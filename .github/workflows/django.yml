@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: alx_travel_app_0x03  
+        working-directory: alx_travel_app 
     strategy:
       max-parallel: 4
       matrix:

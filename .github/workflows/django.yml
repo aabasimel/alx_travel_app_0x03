@@ -12,6 +12,9 @@ jobs:
     defaults:
       run:
         working-directory: alx_travel_app 
+    env:
+      SECRET_KEY: "your-test-secret-key-for-ci-12345"
+      
     strategy:
       max-parallel: 4
       matrix:
